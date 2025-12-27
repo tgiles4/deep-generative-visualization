@@ -366,38 +366,3 @@ def create_latent_2d_scene_from_checkpoints(
         raise
     
     return scene
-
-
-def main():
-    """
-    Main entry point for running the visualization directly.
-    Usage: python -m visualization.manim_scenes.latent_2d <checkpoint_dir>
-    """
-    import sys
-    
-    if len(sys.argv) < 2:
-        print("Usage: python -m visualization.manim_scenes.latent_2d <checkpoint_dir>")
-        sys.exit(1)
-    
-    checkpoint_dir = sys.argv[1]
-    
-    print("=" * 60)
-    print("Rendering 2D Latent Space Visualization")
-    print("=" * 60)
-    print(f"Checkpoint directory: {checkpoint_dir}")
-    print()
-    
-    # Create and render scene
-    scene = create_latent_2d_scene_from_checkpoints(
-        checkpoint_dir=checkpoint_dir,
-    )
-    
-    print()
-    print("=" * 60)
-    print("Rendering complete!")
-    print("=" * 60)
-
-
-if __name__ == "__main__":
-    main()
-
