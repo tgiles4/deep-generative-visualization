@@ -47,6 +47,12 @@ class Latent2DScenePolished(BaseVisualizationScene):
         self.epochs = sorted(latent_data.keys())
 
     def construct(self):
+        self.camera.background_color = BACKGROUND_DARK
+        self.add(Text("CAMERA OK", font_size=64).set_color(WHITE))
+        self.add(Dot(ORIGIN, radius=0.15).set_color(RED))
+        self.wait(0.5)
+        self.clear()
+
         # --- ranges ---
         all_latents = np.concatenate([data[0] for data in self.latent_data.values()])
         
