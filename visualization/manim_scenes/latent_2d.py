@@ -158,7 +158,7 @@ def create_latent_2d_scene_from_checkpoints(
     **scene_kwargs,
 ) -> Latent2DScene:
     """
-    Create Latent2DScene from checkpoint directory.
+    Load checkpoint data and render Manim animation.
     
     Args:
         checkpoint_dir: Directory containing checkpoints
@@ -187,7 +187,13 @@ def create_latent_2d_scene_from_checkpoints(
             continue
     
     if not latent_data:
-        raise ValueError("No latent data found in checkpoint directory")
+        raise ValueError(f"No latent data found in checkpoint directory: {checkpoint_dir}")
     
-    return Latent2DScene(latent_data, **scene_kwargs)
+    # Create and render scene
+    print(f"Rendering visualization for {len(latent_data)} epochs...")
+    scene = Latent2DScene(latent_data, **scene_kwargs)
+    scene.render()
+    print(f"Video saved to: {scene.renderer.file_writer.movie_file_path}")
+    
+    return scene
 

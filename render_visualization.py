@@ -21,8 +21,11 @@ def main():
     print(f"Checkpoint directory: {checkpoint_dir}")
     print()
     
-    # Create scene from checkpoints
-    print("Loading checkpoint data...")
+    # Load checkpoints and render visualization
+    print("Loading checkpoint data and rendering...")
+    print("(This may take a while - Manim rendering can be slow)")
+    print()
+    
     scene = create_latent_2d_scene_from_checkpoints(
         checkpoint_dir=checkpoint_dir,
         epochs=None,  # Use all available epochs
@@ -31,16 +34,6 @@ def main():
         seconds_per_epoch=1.0,
         show_labels=True,
     )
-    
-    print(f"Found {len(scene.epochs)} epochs to visualize")
-    print()
-    print("Rendering scene...")
-    print("(This may take a while - Manim rendering can be slow)")
-    print()
-    
-    # Render the scene
-    # Note: This will create the video in media/videos/
-    scene.render()
     
     print()
     print("=" * 60)
