@@ -89,6 +89,9 @@ class BaseVisualizationScene(Scene):
         base_axis_config = {
             'color': PRIMARY_GREEN,
             'stroke_width': AXIS_WIDTH,
+            'tip_length': 0.2,  # Arrow tip length
+            'tip_width': 0.15,  # Arrow tip width
+            'include_tip': True,
         }
         
         # Build config dict, merging with any provided overrides
@@ -96,10 +99,14 @@ class BaseVisualizationScene(Scene):
             'axis_config': {**base_axis_config, **axis_config.get('axis_config', {})},
             'x_axis_config': {
                 'color': PRIMARY_GREEN,
+                'tip_length': 0.2,
+                'tip_width': 0.15,
                 **axis_config.get('x_axis_config', {}),
             },
             'y_axis_config': {
                 'color': PRIMARY_GREEN,
+                'tip_length': 0.2,
+                'tip_width': 0.15,
                 **axis_config.get('y_axis_config', {}),
             },
         }

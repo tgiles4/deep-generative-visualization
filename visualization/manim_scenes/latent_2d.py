@@ -72,9 +72,9 @@ class Latent2DScene(BaseVisualizationScene):
         x_range = (x_min - x_padding, x_max + x_padding)
         y_range = (y_min - y_padding, y_max + y_padding)
         
-        # Create axes
+        # Create axes - scale smaller to fit on screen
         axes = self.create_axes_2d(x_range=x_range, y_range=y_range)
-        axes.scale(0.8).to_edge(DOWN, buff=0.5)
+        axes.scale(0.6).to_edge(DOWN, buff=0.3)
         
         # Create title
         title = self.create_title("2D Latent Space Evolution")

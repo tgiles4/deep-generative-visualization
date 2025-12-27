@@ -70,10 +70,12 @@ GRID_OPACITY = 0.3
 def get_class_color(class_idx: int, num_classes: int) -> str:
     """
     Get color for a class index.
-    Uses green for class 0, complementary colors for others.
+    Uses a different green shade for class 0 (to distinguish from axes),
+    complementary colors for others.
     """
     if class_idx == 0:
-        return PRIMARY_GREEN
+        # Use ACCENT_GREEN instead of PRIMARY_GREEN to distinguish from axes
+        return ACCENT_GREEN  # "#33FFAA" - lighter green, different from axes
     elif class_idx < len(COMPLEMENTARY_COLORS):
         return COMPLEMENTARY_COLORS[class_idx - 1]
     else:
