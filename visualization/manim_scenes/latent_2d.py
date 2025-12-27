@@ -93,31 +93,41 @@ class Latent2DScenePolished(BaseVisualizationScene):
         y_range = (y_min - y_pad, y_max + y_pad)
 
         # --- plane + axes ---
+        # choose a fixed on-screen footprint
+        X_LEN = 10
+        Y_LEN = 5.6
+
         plane = NumberPlane(
             x_range=[x_range[0], x_range[1], (x_range[1] - x_range[0]) / 6],
             y_range=[y_range[0], y_range[1], (y_range[1] - y_range[0]) / 6],
-            background_line_style={
-                "stroke_opacity": self.grid_opacity,
-                "stroke_width": 1,
-            },
+            x_length=X_LEN,
+            y_length=Y_LEN,
+            background_line_style={"stroke_opacity": self.grid_opacity, "stroke_width": 1},
+        ).set_color(PRIMARY_GREEN)
+
+        x_pad = (x_max - x_min) * 0.12 if x_max > x_min else 1.0
+        y_pad = (y_max - y_min) * 0.12 if y_max > y_min else 1.0
+
+        x_min_p, x_max_p = x_min - x_pad, x_max + x_pad
+        y_min_p, y_max_p = y_min - y_pad, y_max + y_pad
+
+        # Choose a reasonable tick/grid step
+        x_step = (x_max_p - x_min_p) / 6 if (x_max_p > x_min_p) else 1.0
+        y_step = (y_max_p - y_min_p) / 6 if (y_max_p > y_min_p) else 1.0
+
+        axes_x_range = [x_min_p, x_max_p, x_step]
+        axes_y_range = [y_min_p, y_max_p, y_step]
+
+        axes = Axes(
+            x_range=axes_x_range,
+            y_range=axes_y_range,
+            x_length=X_LEN,
+            y_length=Y_LEN,
+            axis_config={"color": PRIMARY_GREEN, "stroke_width": AXIS_WIDTH, "include_tip": True},
         )
-        plane.set_color(PRIMARY_GREEN)
 
-        # Convert tuple ranges to list format for Manim Axes [start, end, step]
-        # Use a reasonable step size based on the range
-        x_step = (x_range[1] - x_range[0]) / 10  # 10 divisions
-        y_step = (y_range[1] - y_range[0]) / 10
-        axes_x_range = [x_range[0], x_range[1], x_step]
-        axes_y_range = [y_range[0], y_range[1], y_step]
-        
-        axes = self.create_axes_2d(x_range=axes_x_range, y_range=axes_y_range)
+        plot_group = VGroup(plane, axes).to_edge(DOWN, buff=0.35)  # <-- no .scale()
 
-        plot_group = VGroup(plane, axes).scale(0.62).to_edge(DOWN, buff=0.35)
-        
-        # Store the transformed axes for coordinate conversion
-        # After transformation, we need to use the transformed axes
-        self.axes = axes
-        self.plot_group = plot_group
 
         # --- title / labels ---
         title = self.create_title("Metric Space / Latent Space Evolution")
