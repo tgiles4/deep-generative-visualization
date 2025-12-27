@@ -3,14 +3,25 @@
 """
 
 from manim import *
+from manim import config
 import numpy as np
 import sys
+import os
+import multiprocessing
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from visualization.manim_scenes.base_scene import BaseVisualizationScene
 from visualization.palette import *
+
+# Configure Manim for parallel rendering (renders partial movie files in parallel)
+# Default is sequential (jobs=1), set to number of CPU cores for parallel rendering
+if 'MANIM_JOBS' in os.environ:
+    config.jobs = int(os.environ['MANIM_JOBS'])
+else:
+    # Default to number of CPU cores, but cap at 4 to avoid overwhelming the system
+    config.jobs = min(multiprocessing.cpu_count(), 8)
 
 
 class Latent2DScene(BaseVisualizationScene):
@@ -191,6 +202,7 @@ def create_latent_2d_scene_from_checkpoints(
     
     # Create and render scene
     print(f"Rendering visualization for {len(latent_data)} epochs...")
+    print(f"Using {config.jobs} parallel jobs for rendering")
     scene = Latent2DScene(latent_data, **scene_kwargs)
     scene.render()
     print(f"Video saved to: {scene.renderer.file_writer.movie_file_path}")

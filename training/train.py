@@ -253,6 +253,13 @@ class VisualizationLightningModule(pl.LightningModule):
         train_loader = self.trainer.train_dataloader
         latent_vectors, labels = self.model.get_latent_vectors(train_loader, self.device)
         
+        # Sample points for visualization if too many (class-balanced sampling)
+        max_points = 5000  # Limit to 5000 points for visualization performance
+        if len(latent_vectors) > max_points:
+            latent_vectors, labels = self._sample_for_visualization(
+                latent_vectors, labels, max_points
+            )
+        
         # Collect images if requested
         images = None
         if self.save_images:
@@ -281,6 +288,56 @@ class VisualizationLightningModule(pl.LightningModule):
             labels,
             all_metrics,
         )
+    
+    def _sample_for_visualization(
+        self,
+        latent_vectors: np.ndarray,
+        labels: np.ndarray,
+        max_points: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """
+        Sample points for visualization with class-balanced sampling.
+        
+        Args:
+            latent_vectors: All latent vectors
+            labels: All labels
+            max_points: Maximum number of points to sample
+            
+        Returns:
+            Sampled (latent_vectors, labels)
+        """
+        if labels is None:
+            # No labels: simple random sampling
+            indices = np.random.choice(len(latent_vectors), max_points, replace=False)
+            return latent_vectors[indices], None
+        
+        # Class-balanced sampling
+        unique_labels = np.unique(labels)
+        n_classes = len(unique_labels)
+        points_per_class = max_points // n_classes
+        
+        sampled_indices = []
+        for label in unique_labels:
+            class_indices = np.where(labels == label)[0]
+            n_sample = min(len(class_indices), points_per_class)
+            sampled = np.random.choice(class_indices, n_sample, replace=False)
+            sampled_indices.extend(sampled)
+        
+        # If we have room, randomly sample remaining points
+        if len(sampled_indices) < max_points:
+            remaining = max_points - len(sampled_indices)
+            all_indices = set(range(len(latent_vectors)))
+            remaining_indices = list(all_indices - set(sampled_indices))
+            if remaining_indices:
+                additional = np.random.choice(
+                    remaining_indices,
+                    min(remaining, len(remaining_indices)),
+                    replace=False
+                )
+                sampled_indices.extend(additional)
+        
+        sampled_indices = np.array(sampled_indices)
+        return latent_vectors[sampled_indices], labels[sampled_indices]
     
     def validation_step(self, batch, batch_idx):
         """Validation step."""
