@@ -75,9 +75,21 @@ class Latent2DScenePolished(BaseVisualizationScene):
         )
         plane.set_color(PRIMARY_GREEN)
 
-        axes = self.create_axes_2d(x_range=x_range, y_range=y_range)
+        # Convert tuple ranges to list format for Manim Axes [start, end, step]
+        # Use a reasonable step size based on the range
+        x_step = (x_range[1] - x_range[0]) / 10  # 10 divisions
+        y_step = (y_range[1] - y_range[0]) / 10
+        axes_x_range = [x_range[0], x_range[1], x_step]
+        axes_y_range = [y_range[0], y_range[1], y_step]
+        
+        axes = self.create_axes_2d(x_range=axes_x_range, y_range=axes_y_range)
 
         plot_group = VGroup(plane, axes).scale(0.62).to_edge(DOWN, buff=0.35)
+        
+        # Store the transformed axes for coordinate conversion
+        # After transformation, we need to use the transformed axes
+        self.axes = axes
+        self.plot_group = plot_group
 
         # --- title / labels ---
         title = self.create_title("Metric Space / Latent Space Evolution")
@@ -89,9 +101,13 @@ class Latent2DScenePolished(BaseVisualizationScene):
         x_lab = self.create_label("z₁", font_size=FONT_SIZE_SMALL).next_to(axes.x_axis, RIGHT, buff=0.2)
         y_lab = self.create_label("z₂", font_size=FONT_SIZE_SMALL).next_to(axes.y_axis, UP, buff=0.2)
 
+        # Add plot_group first so axes are in the scene and transformed
         self.add(plot_group, title)
         if self.show_labels:
             self.add(epoch_label, x_lab, y_lab)
+        
+        # Wait a frame to ensure transformations are applied
+        self.wait(0.01)
 
         # --- initialize dots once ---
         e0 = self.epochs[0]
@@ -105,7 +121,9 @@ class Latent2DScenePolished(BaseVisualizationScene):
         dots = VGroup()
         for i, (latent, label) in enumerate(zip(lat0, lab0)):
             color = get_class_color(int(label), self.num_classes)
-            point = axes.coords_to_point(float(latent[0]), float(latent[1]))
+            # Use the transformed axes for coordinate conversion
+            # The axes are part of plot_group which has been scaled and moved
+            point = self.axes.coords_to_point(float(latent[0]), float(latent[1]))
             d = Dot(
                 point=point,
                 radius=self.point_radius,
@@ -144,7 +162,7 @@ class Latent2DScenePolished(BaseVisualizationScene):
                 if mu is None:
                     continue
                 cd = Dot(
-                    point=axes.coords_to_point(float(mu[0]), float(mu[1])),
+                    point=self.axes.coords_to_point(float(mu[0]), float(mu[1])),
                     radius=self.point_radius * 1.8,
                 ).set_color(get_class_color(c, self.num_classes))
                 cd.set_opacity(0.9)
@@ -169,7 +187,7 @@ class Latent2DScenePolished(BaseVisualizationScene):
                 dots = VGroup()
                 for latent, label in zip(lat, lab):
                     d = Dot(
-                        point=axes.coords_to_point(float(latent[0]), float(latent[1])),
+                        point=self.axes.coords_to_point(float(latent[0]), float(latent[1])),
                         radius=self.point_radius,
                     ).set_color(get_class_color(int(label), self.num_classes))
                     d.set_opacity(0.95)
@@ -178,7 +196,7 @@ class Latent2DScenePolished(BaseVisualizationScene):
             else:
                 anims = []
                 for d, latent, label in zip(dots, lat, lab):
-                    target = axes.coords_to_point(float(latent[0]), float(latent[1]))
+                    target = self.axes.coords_to_point(float(latent[0]), float(latent[1]))
                     color = get_class_color(int(label), self.num_classes)
                     anims.append(d.animate.move_to(target).set_color(color))
 
@@ -197,7 +215,7 @@ class Latent2DScenePolished(BaseVisualizationScene):
                 for c, mu in enumerate(cents):
                     if mu is None:
                         continue
-                    target = axes.coords_to_point(float(mu[0]), float(mu[1]))
+                    target = self.axes.coords_to_point(float(mu[0]), float(mu[1]))
                     cent_anims.append(centroid_dots[k].animate.move_to(target))
                     lab_anims.append(centroid_labels[k].animate.move_to(target + 0.22 * UP))
                     k += 1

@@ -112,6 +112,13 @@ class BaseVisualizationScene(Scene):
         }
         
         # Create axes (Axes doesn't support background_line_style - that's for NumberPlane)
+        # Handle both tuple (start, end) and list [start, end, step] formats
+        if isinstance(x_range, tuple) and len(x_range) == 2:
+            # Convert tuple to list format with default step
+            x_range = [x_range[0], x_range[1], (x_range[1] - x_range[0]) / 10]
+        if isinstance(y_range, tuple) and len(y_range) == 2:
+            y_range = [y_range[0], y_range[1], (y_range[1] - y_range[0]) / 10]
+        
         axes = Axes(
             x_range=x_range,
             y_range=y_range,
