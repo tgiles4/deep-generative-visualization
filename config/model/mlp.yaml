@@ -1,0 +1,8 @@
+# MLP model configuration
+_target_: models.mlp.MLP
+input_dim: 784
+hidden_dims: [512, 256]
+output_dim: 10
+visualization_dim: 2
+activation: "ReLU"
+

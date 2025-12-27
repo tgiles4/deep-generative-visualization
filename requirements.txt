@@ -1,0 +1,19 @@
+# Core dependencies (Python 3.12.12 compatible)
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+h5py>=3.9.0
+pytorch-lightning>=2.0.0
+hydra-core>=1.3.0
+omegaconf>=2.3.0
+
+# Visualization
+manim>=0.17.0
+
+# Utilities
+tqdm>=4.65.0
+
+# Note: For Colab, install system packages first (see COLAB_SETUP.md):
+# !sudo apt update
+# !sudo apt install -y libcairo2-dev ffmpeg texlive texlive-latex-extra texlive-fonts-extra texlive-latex-recommended texlive-science tipa libpango1.0-dev
+

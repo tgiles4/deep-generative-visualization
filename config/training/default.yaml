@@ -1,0 +1,6 @@
+# Default training configuration
+num_epochs: 30
+batch_size: 128
+learning_rate: 0.001
+val_split: 0.1
+

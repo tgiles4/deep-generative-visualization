@@ -1,0 +1,4 @@
+# MNIST dataset configuration
+name: "mnist"
+data_dir: "./data"
+download: true

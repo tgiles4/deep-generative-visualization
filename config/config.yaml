@@ -1,0 +1,42 @@
+# Main configuration file for training and visualization
+# Use config groups: model=mlp, training=default, dataset=mnist
+
+defaults:
+  - model: mlp
+  - training: default
+  - dataset: mnist
+
+# Checkpointing configuration
+checkpointing:
+  checkpoint_dir: "./checkpoints/mlp_mnist"
+  save_every_n_epochs: 1
+  save_images: false
+
+# Lightning trainer configuration
+trainer:
+  accelerator: "auto"  # auto, gpu, cpu
+  devices: 1
+  enable_progress_bar: true
+  # precision: "16-mixed"  # Optional: for mixed precision training
+
+# Visualization configuration (for post-training)
+visualization:
+  # Will be used when generating visualizations
+  point_size: 0.04
+  seconds_per_epoch: 1.0
+  show_labels: true
+
+# Optional: override criterion (default: CrossEntropyLoss)
+# Uncomment to use custom criterion:
+# training:
+#   criterion:
+#     _target_: torch.nn.CrossEntropyLoss
+#     label_smoothing: 0.1
+
+# Optional: override optimizer (default: Adam)
+# Uncomment to use custom optimizer:
+# training:
+#   optimizer:
+#     _target_: torch.optim.AdamW
+#     kwargs:
+#       weight_decay: 0.01

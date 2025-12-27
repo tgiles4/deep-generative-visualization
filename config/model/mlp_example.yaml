@@ -1,0 +1,24 @@
+# Example MLP configuration for Hydra
+# This shows how activation and architecture can be configured
+
+_target_: models.mlp.MLP  # Hydra will instantiate this class
+
+# Architecture parameters
+input_dim: 784  # MNIST flattened
+hidden_dims: [512, 256]  # List of hidden layer dimensions
+output_dim: 10  # Number of classes
+visualization_dim: 2  # 2D visualization (or 3 for 3D)
+
+# Activation function - can be string (Hydra-friendly) or class
+# String options: "ReLU", "GELU", "Tanh", "Sigmoid", "LeakyReLU", etc.
+activation: "ReLU"
+
+# Alternative activation configurations:
+# activation: "GELU"  # For smoother representations
+# activation: "Tanh"  # Bounded activations
+# activation: "LeakyReLU"  # With negative slope
+
+# Example with different architecture:
+# hidden_dims: [1024, 512, 256, 128]  # Deeper network
+# visualization_dim: 3  # 3D visualization
+
