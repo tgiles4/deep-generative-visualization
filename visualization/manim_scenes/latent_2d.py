@@ -20,146 +20,177 @@ from visualization.palette import *
 if 'MANIM_JOBS' in os.environ:
     config.jobs = int(os.environ['MANIM_JOBS'])
 else:
-    # Default to number of CPU cores, but cap at 4 to avoid overwhelming the system
+    # Default to number of CPU cores, but cap at 8 to avoid overwhelming the system
     config.jobs = min(multiprocessing.cpu_count(), 8)
 
 
-class Latent2DScene(BaseVisualizationScene):
-    """
-    Scene for visualizing 2D latent space evolution during training.
-    Shows scatter plot of latent vectors colored by class labels.
-    """
-    
+class Latent2DScenePolished(BaseVisualizationScene):
     def __init__(
         self,
-        latent_data: dict,  # {epoch: (latent_vectors, labels)}
+        latent_data: dict,                 # {epoch: (latent_vectors, labels)}
         num_classes: int = 10,
-        point_size: float = POINT_SIZE_MEDIUM,
+        point_radius: float = POINT_SIZE_MEDIUM,
         seconds_per_epoch: float = 1.0,
         show_labels: bool = True,
+        show_centroids: bool = True,
+        grid_opacity: float = 0.25,
         **kwargs,
     ):
-        """
-        Initialize 2D latent space scene.
-        
-        Args:
-            latent_data: Dictionary mapping epoch to (latent_vectors, labels) tuples
-            num_classes: Number of classes
-            point_size: Size of scatter plot points
-            seconds_per_epoch: Animation duration per epoch
-            show_labels: Whether to show axis labels and epoch number
-        """
         super().__init__(**kwargs)
         self.latent_data = latent_data
         self.num_classes = num_classes
-        self.point_size = point_size
+        self.point_radius = point_radius
         self.seconds_per_epoch = seconds_per_epoch
         self.show_labels = show_labels
-        
-        # Get all epochs sorted
+        self.show_centroids = show_centroids
+        self.grid_opacity = grid_opacity
         self.epochs = sorted(latent_data.keys())
-    
+
     def construct(self):
-        """Construct the animation."""
-        # Determine axis ranges from all data
+        # --- ranges ---
         all_latents = np.concatenate([data[0] for data in self.latent_data.values()])
-        x_min, x_max = all_latents[:, 0].min(), all_latents[:, 0].max()
-        y_min, y_max = all_latents[:, 1].min(), all_latents[:, 1].max()
-        
-        # Add padding
-        x_padding = (x_max - x_min) * 0.1
-        y_padding = (y_max - y_min) * 0.1
-        x_range = (x_min - x_padding, x_max + x_padding)
-        y_range = (y_min - y_padding, y_max + y_padding)
-        
-        # Create axes - scale smaller to fit on screen
+        x_min, x_max = float(all_latents[:, 0].min()), float(all_latents[:, 0].max())
+        y_min, y_max = float(all_latents[:, 1].min()), float(all_latents[:, 1].max())
+
+        x_pad = (x_max - x_min) * 0.12 if x_max > x_min else 1.0
+        y_pad = (y_max - y_min) * 0.12 if y_max > y_min else 1.0
+        x_range = (x_min - x_pad, x_max + x_pad)
+        y_range = (y_min - y_pad, y_max + y_pad)
+
+        # --- plane + axes ---
+        plane = NumberPlane(
+            x_range=[x_range[0], x_range[1], (x_range[1] - x_range[0]) / 6],
+            y_range=[y_range[0], y_range[1], (y_range[1] - y_range[0]) / 6],
+            background_line_style={
+                "stroke_opacity": self.grid_opacity,
+                "stroke_width": 1,
+            },
+        )
+        plane.set_color(PRIMARY_GREEN)
+
         axes = self.create_axes_2d(x_range=x_range, y_range=y_range)
-        axes.scale(0.6).to_edge(DOWN, buff=0.3)
-        
-        # Create title
-        title = self.create_title("2D Latent Space Evolution")
+
+        plot_group = VGroup(plane, axes).scale(0.62).to_edge(DOWN, buff=0.35)
+
+        # --- title / labels ---
+        title = self.create_title("Metric Space / Latent Space Evolution")
         title.to_edge(UP, buff=0.3)
-        
-        # Create epoch label
-        epoch_label = self.create_label("Epoch: 0", font_size=FONT_SIZE_SMALL)
-        epoch_label.to_edge(RIGHT, buff=0.5)
-        epoch_label.to_edge(UP, buff=0.5)
-        
-        # Add static elements
-        self.add(axes, title)
+
+        epoch_label = self.create_label(f"Epoch: {self.epochs[0]}", font_size=FONT_SIZE_SMALL)
+        epoch_label.to_corner(UR, buff=0.4)
+
+        x_lab = self.create_label("z₁", font_size=FONT_SIZE_SMALL).next_to(axes.x_axis, RIGHT, buff=0.2)
+        y_lab = self.create_label("z₂", font_size=FONT_SIZE_SMALL).next_to(axes.y_axis, UP, buff=0.2)
+
+        self.add(plot_group, title)
         if self.show_labels:
-            self.add(epoch_label)
-        
-        # Animate through epochs
-        dots_group = None
-        
-        for i, epoch in enumerate(self.epochs):
-            latent_vectors, labels = self.latent_data[epoch]
-            
-            # Create dots for this epoch
-            dots = VGroup()
-            for latent, label in zip(latent_vectors, labels):
-                color = get_class_color(int(label), self.num_classes)
-                dot = Dot(
-                    axes.coords_to_point(latent[0], latent[1]),
-                    color=color,
-                    radius=self.point_size,
-                )
-                dots.add(dot)
-            
-            # Animate dots
-            if i == 0:
-                # First epoch: fade in
-                self.play(FadeIn(dots), run_time=0.5)
-                dots_group = dots
+            self.add(epoch_label, x_lab, y_lab)
+
+        # --- initialize dots once ---
+        e0 = self.epochs[0]
+        lat0, lab0 = self.latent_data[e0]
+        dots = VGroup()
+        for latent, label in zip(lat0, lab0):
+            color = get_class_color(int(label), self.num_classes)
+            d = Dot(
+                point=axes.coords_to_point(float(latent[0]), float(latent[1])),
+                radius=self.point_radius,
+            )
+            d.set_color(color)
+            d.set_opacity(0.95)
+            dots.add(d)
+
+        self.play(FadeIn(dots, shift=0.1 * UP), run_time=0.6, rate_func=smooth)
+
+        # --- optional: centroids (anchors make “learning” read better) ---
+        centroid_dots = VGroup()
+        centroid_labels = VGroup()
+
+        def compute_centroids(latents, labels):
+            centroids = []
+            for c in range(self.num_classes):
+                idx = np.where(labels.astype(int) == c)[0]
+                if len(idx) == 0:
+                    centroids.append(None)
+                else:
+                    centroids.append(latents[idx].mean(axis=0))
+            return centroids
+
+        if self.show_centroids:
+            cents0 = compute_centroids(lat0, lab0)
+            for c, mu in enumerate(cents0):
+                if mu is None:
+                    continue
+                cd = Dot(
+                    point=axes.coords_to_point(float(mu[0]), float(mu[1])),
+                    radius=self.point_radius * 1.8,
+                ).set_color(get_class_color(c, self.num_classes))
+                cd.set_opacity(0.9)
+
+                cl = Text(str(c), font_size=18)
+                cl.set_color(TEXT_WHITE)
+                cl.move_to(cd.get_center() + 0.22 * UP)
+
+                centroid_dots.add(cd)
+                centroid_labels.add(cl)
+
+            self.play(FadeIn(centroid_dots), FadeIn(centroid_labels), run_time=0.4)
+
+        # --- animate epochs (in-place updates; no rebuilding) ---
+        for i, epoch in enumerate(self.epochs[1:], start=1):
+            lat, lab = self.latent_data[epoch]
+
+            # If ordering isn't stable across epochs, movement will look wrong.
+            # (Fix = store a stable sample_id ordering and align by id.)
+            if len(lat) != len(dots):
+                self.play(FadeOut(dots), run_time=0.25)
+                dots = VGroup()
+                for latent, label in zip(lat, lab):
+                    d = Dot(
+                        point=axes.coords_to_point(float(latent[0]), float(latent[1])),
+                        radius=self.point_radius,
+                    ).set_color(get_class_color(int(label), self.num_classes))
+                    d.set_opacity(0.95)
+                    dots.add(d)
+                self.play(FadeIn(dots), run_time=0.35)
             else:
-                # Subsequent epochs: transform positions
-                if dots_group is not None and len(dots) == len(dots_group):
-                    # Same number of points: animate movement
-                    animations = []
-                    for k in range(len(dots)):
-                        # Create new dot at target position
-                        target_dot = dots[k]
-                        # Transform existing dot to new position
-                        animations.append(
-                            dots_group[k].animate.move_to(target_dot.get_center())
-                        )
-                        # Update color if needed
-                        if dots_group[k].color != target_dot.color:
-                            animations.append(
-                                dots_group[k].animate.set_color(target_dot.color)
-                            )
-                    
-                    if animations:
-                        self.play(*animations, run_time=self.seconds_per_epoch * 0.8)
-                    
-                    # Replace dots_group with new dots (for next iteration)
-                    self.remove(dots_group)
-                    dots_group = dots
-                    self.add(dots_group)
-                else:
-                    # Different number of points: fade out and in
-                    if dots_group is not None:
-                        self.play(FadeOut(dots_group), run_time=0.2)
-                    self.play(FadeIn(dots), run_time=0.3)
-                    dots_group = dots
-            
-            # Update epoch label
+                anims = []
+                for d, latent, label in zip(dots, lat, lab):
+                    target = axes.coords_to_point(float(latent[0]), float(latent[1]))
+                    color = get_class_color(int(label), self.num_classes)
+                    anims.append(d.animate.move_to(target).set_color(color))
+
+                self.play(
+                    AnimationGroup(*anims, lag_ratio=0.0),
+                    run_time=self.seconds_per_epoch,
+                    rate_func=rate_functions.ease_in_out_cubic,
+                )
+
+            if self.show_centroids:
+                cents = compute_centroids(lat, lab)
+                cent_anims = []
+                lab_anims = []
+                # update only the ones that exist
+                k = 0
+                for c, mu in enumerate(cents):
+                    if mu is None:
+                        continue
+                    target = axes.coords_to_point(float(mu[0]), float(mu[1]))
+                    cent_anims.append(centroid_dots[k].animate.move_to(target))
+                    lab_anims.append(centroid_labels[k].animate.move_to(target + 0.22 * UP))
+                    k += 1
+                if cent_anims:
+                    self.play(AnimationGroup(*cent_anims, *lab_anims, lag_ratio=0.0),
+                              run_time=0.35,
+                              rate_func=smooth)
+
             if self.show_labels:
-                new_label = self.create_label(f"Epoch: {epoch}", font_size=FONT_SIZE_SMALL)
-                new_label.to_edge(RIGHT, buff=0.5)
-                new_label.to_edge(UP, buff=0.5)
-                if i == 0:
-                    # First epoch: set initial label
-                    epoch_label.become(new_label)
-                else:
-                    self.play(Transform(epoch_label, new_label), run_time=0.2)
-            
-            # Pause between epochs (except last)
-            if i < len(self.epochs) - 1:
-                self.wait(0.1)
-        
-        # Final pause
+                new_epoch_label = self.create_label(f"Epoch: {epoch}", font_size=FONT_SIZE_SMALL).to_corner(UR, buff=0.4)
+                self.play(Transform(epoch_label, new_epoch_label), run_time=0.2)
+
+            # small settle helps perception
+            self.wait(0.05)
+
         self.wait(1.0)
 
 
