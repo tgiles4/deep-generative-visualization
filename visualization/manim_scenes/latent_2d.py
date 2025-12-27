@@ -128,7 +128,7 @@ class Latent2DScenePolished(BaseVisualizationScene):
 
         plot_group = VGroup(plane, axes).to_edge(DOWN, buff=0.35)  # <-- no .scale()
 
-
+        self.axes = axes
         # --- title / labels ---
         title = self.create_title("Metric Space / Latent Space Evolution")
         title.to_edge(UP, buff=0.3)
