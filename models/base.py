@@ -167,18 +167,26 @@ class BaseLatentModel(nn.Module, ABC):
             device: Device to run inference on
             
         Returns:
-            Tuple of (latent_vectors, labels) where:
+            Tuple of (latent_vectors, labels, sample_nums) where:
             - latent_vectors: numpy array of shape (n_samples, latent_dim)
-            - labels: numpy array of shape (n_samples,)
+            - labels: numpy array of shape (n_samples,) or None
+            - sample_nums: numpy array of shape (n_samples,) with global sample indices
         """
         self.eval()
         latents = []
         labels = []
+        sample_nums = []
         
         with torch.no_grad():
             for batch in dataloader:
                 if isinstance(batch, (list, tuple)):
-                    x, y = batch[0], batch[1]
+                    if len(batch) == 3:
+                        # Dataset returns (x, y, idx)
+                        x, y, idx = batch[0], batch[1], batch[2]
+                        sample_nums.append(idx.cpu().numpy())
+                    else:
+                        # Dataset returns (x, y)
+                        x, y = batch[0], batch[1]
                 else:
                     x, y = batch, None
                 
@@ -195,4 +203,10 @@ class BaseLatentModel(nn.Module, ABC):
         else:
             labels = None
         
-        return latents, labels
+        if sample_nums:
+            sample_nums = np.concatenate(sample_nums, axis=0)
+        else:
+            # Fallback: generate sequential indices if dataset doesn't provide them
+            sample_nums = np.arange(len(latents), dtype=np.int32)
+        
+        return latents, labels, sample_nums

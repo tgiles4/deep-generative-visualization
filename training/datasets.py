@@ -4,7 +4,44 @@ Dataset loaders and preprocessing utilities.
 
 import torch
 from torchvision import datasets, transforms
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Dataset
+
+
+class IndexedDataset(Dataset):
+    """
+    Wrapper dataset that adds global indices to samples.
+    Returns (x, y, idx) where idx is the global MNIST index.
+    """
+    def __init__(self, base_dataset, indices=None):
+        """
+        Args:
+            base_dataset: Base dataset (e.g., MNIST or Subset)
+            indices: Optional list of indices to use. If None, uses all indices.
+                    For Subset, this should be the subset's indices.
+        """
+        self.base_dataset = base_dataset
+        # If base_dataset is a Subset, get the original indices
+        if hasattr(base_dataset, 'indices'):
+            # It's a Subset from random_split
+            # Convert to list if it's a tensor
+            idx = base_dataset.indices
+            if isinstance(idx, torch.Tensor):
+                self.global_indices = idx.tolist()
+            else:
+                self.global_indices = list(idx)
+        elif indices is not None:
+            self.global_indices = list(indices)
+        else:
+            # Full dataset - indices are just 0..len-1
+            self.global_indices = list(range(len(base_dataset)))
+    
+    def __len__(self):
+        return len(self.base_dataset)
+    
+    def __getitem__(self, idx):
+        x, y = self.base_dataset[idx]
+        global_idx = self.global_indices[idx]
+        return x, y, global_idx
 
 
 def get_mnist_loaders(
@@ -60,11 +97,15 @@ def get_mnist_loaders(
         
         # Use random seed for reproducibility
         generator = torch.Generator().manual_seed(random_seed)
-        train_dataset, val_dataset = random_split(
+        train_subset, val_subset = random_split(
             full_train_dataset,
             [train_size, val_size],
             generator=generator
         )
+        
+        # Wrap with IndexedDataset to preserve global indices
+        train_dataset = IndexedDataset(train_subset)
+        val_dataset = IndexedDataset(val_subset)
         
         val_loader = DataLoader(
             val_dataset,
@@ -74,7 +115,7 @@ def get_mnist_loaders(
             pin_memory=True,
         )
     else:
-        train_dataset = full_train_dataset
+        train_dataset = IndexedDataset(full_train_dataset)
         val_loader = None
     
     train_loader = DataLoader(
@@ -85,8 +126,11 @@ def get_mnist_loaders(
         pin_memory=True,
     )
     
+    # Wrap test dataset with IndexedDataset
+    # For test set, global indices start from 60000 (after training set)
+    test_dataset_wrapped = IndexedDataset(test_dataset, indices=list(range(60000, 60000 + len(test_dataset))))
     test_loader = DataLoader(
-        test_dataset,
+        test_dataset_wrapped,
         batch_size=batch_size,
         shuffle=False,
         num_workers=2,

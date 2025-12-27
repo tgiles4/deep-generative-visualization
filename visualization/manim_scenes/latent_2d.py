@@ -198,7 +198,7 @@ def create_latent_2d_scene_from_checkpoints(
     checkpoint_dir: str,
     epochs: list = None,
     **scene_kwargs,
-) -> Latent2DScene:
+) -> Latent2DScenePolished:
     """
     Load checkpoint data and render Manim animation.
     
@@ -218,12 +218,26 @@ def create_latent_2d_scene_from_checkpoints(
     if epochs is None:
         epochs = checkpoint_manager.get_available_epochs()
     
-    # Load latent data
+    # Load latent data and align by sample_nums
     latent_data = {}
+    all_sample_nums = None
+    
     for epoch in epochs:
         try:
             snapshot = checkpoint_manager.load_latent_snapshot(epoch, include_images=False)
-            latent_data[epoch] = (snapshot['latent_vectors'], snapshot['labels'])
+            sample_nums = snapshot['sample_nums']
+            
+            # Find intersection of sample_nums across all epochs
+            if all_sample_nums is None:
+                all_sample_nums = set(sample_nums)
+            else:
+                all_sample_nums = all_sample_nums.intersection(set(sample_nums))
+            
+            latent_data[epoch] = (
+                snapshot['latent_vectors'],
+                snapshot['labels'],
+                sample_nums
+            )
         except FileNotFoundError:
             print(f"Warning: Checkpoint for epoch {epoch} not found, skipping")
             continue
@@ -231,10 +245,35 @@ def create_latent_2d_scene_from_checkpoints(
     if not latent_data:
         raise ValueError(f"No latent data found in checkpoint directory: {checkpoint_dir}")
     
+    # Convert to sorted array for consistent ordering
+    if all_sample_nums:
+        all_sample_nums = np.array(sorted(all_sample_nums))
+    else:
+        raise ValueError("No common sample_nums found across epochs")
+    
+    # Align all epochs by sample_nums (filter and sort)
+    aligned_latent_data = {}
+    for epoch, (latent_vectors, labels, sample_nums) in latent_data.items():
+        # Filter to common sample_nums
+        mask = np.isin(sample_nums, all_sample_nums)
+        filtered_latents = latent_vectors[mask]
+        filtered_labels = labels[mask] if labels is not None else None
+        filtered_sample_nums = sample_nums[mask]
+        
+        # Sort by sample_nums for consistent ordering
+        sort_idx = np.argsort(filtered_sample_nums)
+        aligned_latents = filtered_latents[sort_idx]
+        aligned_labels = filtered_labels[sort_idx] if filtered_labels is not None else None
+        
+        aligned_latent_data[epoch] = (aligned_latents, aligned_labels)
+    
+    latent_data = aligned_latent_data
+    
     # Create and render scene
     print(f"Rendering visualization for {len(latent_data)} epochs...")
     print(f"Using {config.jobs} parallel jobs for rendering")
-    scene = Latent2DScene(latent_data, **scene_kwargs)
+    print(f"Aligned {len(all_sample_nums)} samples across all epochs")
+    scene = Latent2DScenePolished(latent_data, **scene_kwargs)
     scene.render()
     print(f"Video saved to: {scene.renderer.file_writer.movie_file_path}")
     

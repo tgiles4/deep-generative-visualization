@@ -94,6 +94,9 @@ class VisualizationLightningModule(pl.LightningModule):
         self.training_step_outputs = []
         self.validation_step_outputs = []
         self.test_step_outputs = []
+        
+        # Store IDs for consistent subsampling across epochs
+        self.keep_ids = None
     
     def _compute_loss(self, output: torch.Tensor, target: torch.Tensor) -> tuple[torch.Tensor, dict[str, float]]:
         """
@@ -251,24 +254,57 @@ class VisualizationLightningModule(pl.LightningModule):
         
         # Get latent vectors for visualization (from training data)
         train_loader = self.trainer.train_dataloader
-        latent_vectors, labels = self.model.get_latent_vectors(train_loader, self.device)
+        latent_vectors, labels, sample_nums = self.model.get_latent_vectors(train_loader, self.device)
         
-        # Sample points for visualization if too many (class-balanced sampling)
-        max_points = 5000  # Limit to 5000 points for visualization performance
-        if len(latent_vectors) > max_points:
-            latent_vectors, labels = self._sample_for_visualization(
-                latent_vectors, labels, max_points
-            )
+        # Subsample once (stratified) and reuse the same IDs every epoch
+        max_points = 1000  # Limit to 1000 points for visualization performance
+        if self.keep_ids is None:
+            # First epoch: do stratified sampling and store IDs
+            if len(latent_vectors) > max_points:
+                latent_vectors, labels, sample_nums, keep_ids = self._sample_for_visualization(
+                    latent_vectors, labels, sample_nums, max_points
+                )
+                self.keep_ids = keep_ids
+            else:
+                self.keep_ids = sample_nums.copy()
+        else:
+            # Subsequent epochs: filter by keep_ids and sort by id
+            mask = np.isin(sample_nums, self.keep_ids)
+            latent_vectors = latent_vectors[mask]
+            labels = labels[mask] if labels is not None else None
+            sample_nums = sample_nums[mask]
+            
+            # Sort by sample_nums for consistent ordering
+            sort_idx = np.argsort(sample_nums)
+            latent_vectors = latent_vectors[sort_idx]
+            labels = labels[sort_idx] if labels is not None else None
+            sample_nums = sample_nums[sort_idx]
         
-        # Collect images if requested
+        # Collect images if requested (only for kept samples)
         images = None
         if self.save_images:
-            images_list = []
+            images_dict = {}  # Map sample_num -> image
             self.model.eval()
             with torch.no_grad():
-                for data, _ in train_loader:
-                    images_list.append(data.cpu().numpy())
-            images = np.concatenate(images_list, axis=0)
+                for batch in train_loader:
+                    if isinstance(batch, (list, tuple)) and len(batch) == 3:
+                        data, _, idx = batch[0], batch[1], batch[2]
+                        idx_np = idx.cpu().numpy()
+                        data_np = data.cpu().numpy()
+                        # Only keep images for samples in keep_ids
+                        for i, sample_id in enumerate(idx_np):
+                            if sample_id in self.keep_ids:
+                                images_dict[sample_id] = data_np[i]
+                    else:
+                        # Fallback: if no indices, collect all (shouldn't happen with IndexedDataset)
+                        data, _ = batch[0], batch[1]
+                        data_np = data.cpu().numpy()
+                        # Without indices, we can't properly map, so skip
+                        # This shouldn't happen with IndexedDataset
+                        pass
+            if images_dict and len(images_dict) == len(sample_nums):
+                # Reconstruct images array in same order as sample_nums
+                images = np.array([images_dict[sid] for sid in sample_nums])
         
         # Save checkpoint
         if self.current_epoch % self.save_every_n_epochs == 0:
@@ -276,6 +312,7 @@ class VisualizationLightningModule(pl.LightningModule):
                 latent_vectors=latent_vectors,
                 labels=labels,
                 epoch=self.current_epoch,
+                sample_nums=sample_nums,
                 images=images,
             )
             self.checkpoint_manager.save_metrics(all_metrics, self.current_epoch)
@@ -293,25 +330,29 @@ class VisualizationLightningModule(pl.LightningModule):
         self,
         latent_vectors: np.ndarray,
         labels: np.ndarray,
+        sample_nums: np.ndarray,
         max_points: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """
         Sample points for visualization with class-balanced sampling.
+        Returns both the sampled data and the keep_ids for reuse.
         
         Args:
             latent_vectors: All latent vectors
             labels: All labels
+            sample_nums: All sample IDs
             max_points: Maximum number of points to sample
             
         Returns:
-            Sampled (latent_vectors, labels)
+            Tuple of (sampled_latent_vectors, sampled_labels, sampled_sample_nums, keep_ids)
         """
         if labels is None:
             # No labels: simple random sampling
             indices = np.random.choice(len(latent_vectors), max_points, replace=False)
-            return latent_vectors[indices], None
+            keep_ids = sample_nums[indices]
+            return latent_vectors[indices], None, sample_nums[indices], keep_ids
         
-        # Class-balanced sampling
+        # Class-balanced stratified sampling (~100 per class for 1000 total)
         unique_labels = np.unique(labels)
         n_classes = len(unique_labels)
         points_per_class = max_points // n_classes
@@ -337,7 +378,14 @@ class VisualizationLightningModule(pl.LightningModule):
                 sampled_indices.extend(additional)
         
         sampled_indices = np.array(sampled_indices)
-        return latent_vectors[sampled_indices], labels[sampled_indices]
+        keep_ids = sample_nums[sampled_indices]
+        
+        return (
+            latent_vectors[sampled_indices],
+            labels[sampled_indices],
+            sample_nums[sampled_indices],
+            keep_ids
+        )
     
     def validation_step(self, batch, batch_idx):
         """Validation step."""
