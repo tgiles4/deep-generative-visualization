@@ -69,7 +69,7 @@ class Latent2DScenePolished(BaseVisualizationScene):
         print(f"DEBUG: Adding test objects")
         print(f"  Text center: {test_text.get_center()}")
         print(f"  Dot center: {test_dot.get_center()}")
-        print(f"  Camera frame center: {self.camera.frame.get_center()}")
+        print(f"  Camera background: {self.camera.background_color}")
         
         self.add(test_text, test_dot)
         self.wait(2.0)  # Wait longer to see it
