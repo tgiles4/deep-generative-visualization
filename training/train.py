@@ -177,7 +177,11 @@ class VisualizationLightningModule(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         """Training step."""
-        data, target = batch
+        # Handle both (data, target) and (data, target, idx) formats
+        if isinstance(batch, (list, tuple)) and len(batch) == 3:
+            data, target, _ = batch
+        else:
+            data, target = batch
         data = self._flatten_if_needed(data)
         
         # Forward pass
@@ -389,7 +393,11 @@ class VisualizationLightningModule(pl.LightningModule):
     
     def validation_step(self, batch, batch_idx):
         """Validation step."""
-        data, target = batch
+        # Handle both (data, target) and (data, target, idx) formats
+        if isinstance(batch, (list, tuple)) and len(batch) == 3:
+            data, target, _ = batch
+        else:
+            data, target = batch
         data = self._flatten_if_needed(data)
         
         output = self.model(data)
@@ -446,7 +454,11 @@ class VisualizationLightningModule(pl.LightningModule):
     
     def test_step(self, batch, batch_idx):
         """Test step."""
-        data, target = batch
+        # Handle both (data, target) and (data, target, idx) formats
+        if isinstance(batch, (list, tuple)) and len(batch) == 3:
+            data, target, _ = batch
+        else:
+            data, target = batch
         data = self._flatten_if_needed(data)
         
         output = self.model(data)
