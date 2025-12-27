@@ -47,11 +47,25 @@ class Latent2DScenePolished(BaseVisualizationScene):
         self.epochs = sorted(latent_data.keys())
 
     def construct(self):
+        # Test camera and rendering - ensure objects are visible
         self.camera.background_color = BACKGROUND_DARK
-        self.add(Text("CAMERA OK", font_size=64).set_color(WHITE))
-        self.add(Dot(ORIGIN, radius=0.15).set_color(RED))
-        self.wait(0.5)
-        self.clear()
+        
+        # Create test objects - use explicit positioning
+        test_text = Text("CAMERA OK", font_size=64, color="#FFFFFF")
+        test_dot = Dot(radius=0.2, color="#FF0000")
+        
+        # Position at origin explicitly
+        test_text.move_to([0, 0, 0])
+        test_dot.move_to([0, 0, 0])
+        
+        print(f"DEBUG: Adding test objects")
+        print(f"  Text center: {test_text.get_center()}")
+        print(f"  Dot center: {test_dot.get_center()}")
+        print(f"  Camera frame center: {self.camera.frame.get_center()}")
+        
+        self.add(test_text, test_dot)
+        self.wait(2.0)  # Wait longer to see it
+        self.remove(test_text, test_dot)
 
         # --- ranges ---
         all_latents = np.concatenate([data[0] for data in self.latent_data.values()])
@@ -333,9 +347,57 @@ def create_latent_2d_scene_from_checkpoints(
     print(f"Rendering visualization for {len(latent_data)} epochs...")
     print(f"Using {config.jobs} parallel jobs for rendering")
     print(f"Aligned {len(all_sample_nums)} samples across all epochs")
+    
+    # Create scene instance
     scene = Latent2DScenePolished(latent_data, **scene_kwargs)
-    scene.render()
-    print(f"Video saved to: {scene.renderer.file_writer.movie_file_path}")
+    
+    # Render the scene
+    # Note: When calling render() directly, ensure Manim config is set up properly
+    try:
+        scene.render()
+        if hasattr(scene, 'renderer') and hasattr(scene.renderer, 'file_writer'):
+            print(f"Video saved to: {scene.renderer.file_writer.movie_file_path}")
+        else:
+            print("Warning: Could not determine output file path")
+    except Exception as e:
+        print(f"Error during rendering: {e}")
+        print("Try rendering via Manim CLI instead:")
+        print(f"  manim -pql visualization/manim_scenes/latent_2d.py Latent2DScenePolished")
+        raise
     
     return scene
+
+
+def main():
+    """
+    Main entry point for running the visualization directly.
+    Usage: python -m visualization.manim_scenes.latent_2d <checkpoint_dir>
+    """
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python -m visualization.manim_scenes.latent_2d <checkpoint_dir>")
+        sys.exit(1)
+    
+    checkpoint_dir = sys.argv[1]
+    
+    print("=" * 60)
+    print("Rendering 2D Latent Space Visualization")
+    print("=" * 60)
+    print(f"Checkpoint directory: {checkpoint_dir}")
+    print()
+    
+    # Create and render scene
+    scene = create_latent_2d_scene_from_checkpoints(
+        checkpoint_dir=checkpoint_dir,
+    )
+    
+    print()
+    print("=" * 60)
+    print("Rendering complete!")
+    print("=" * 60)
+
+
+if __name__ == "__main__":
+    main()
 
