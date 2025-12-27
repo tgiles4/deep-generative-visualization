@@ -49,8 +49,15 @@ class Latent2DScenePolished(BaseVisualizationScene):
     def construct(self):
         # --- ranges ---
         all_latents = np.concatenate([data[0] for data in self.latent_data.values()])
+        
+        if len(all_latents) == 0:
+            print("ERROR: No latent vectors to visualize!")
+            return
+        
         x_min, x_max = float(all_latents[:, 0].min()), float(all_latents[:, 0].max())
         y_min, y_max = float(all_latents[:, 1].min()), float(all_latents[:, 1].max())
+        
+        print(f"Scene: Data range x=[{x_min:.3f}, {x_max:.3f}], y=[{y_min:.3f}, {y_max:.3f}]")
 
         x_pad = (x_max - x_min) * 0.12 if x_max > x_min else 1.0
         y_pad = (y_max - y_min) * 0.12 if y_max > y_min else 1.0
@@ -89,16 +96,31 @@ class Latent2DScenePolished(BaseVisualizationScene):
         # --- initialize dots once ---
         e0 = self.epochs[0]
         lat0, lab0 = self.latent_data[e0]
+        
+        print(f"Scene: Creating {len(lat0)} dots for epoch {e0}")
+        if len(lat0) == 0:
+            print("ERROR: No dots to create!")
+            return
+        
         dots = VGroup()
-        for latent, label in zip(lat0, lab0):
+        for i, (latent, label) in enumerate(zip(lat0, lab0)):
             color = get_class_color(int(label), self.num_classes)
+            point = axes.coords_to_point(float(latent[0]), float(latent[1]))
             d = Dot(
-                point=axes.coords_to_point(float(latent[0]), float(latent[1])),
+                point=point,
                 radius=self.point_radius,
             )
             d.set_color(color)
             d.set_opacity(0.95)
             dots.add(d)
+            
+            # Debug first few dots
+            if i < 3:
+                print(f"  Dot {i}: latent=({latent[0]:.3f}, {latent[1]:.3f}), "
+                      f"point=({point[0]:.3f}, {point[1]:.3f}, {point[2]:.3f}), "
+                      f"label={int(label)}, color={color}")
+        
+        print(f"Scene: Created {len(dots)} dots, adding to scene...")
 
         self.play(FadeIn(dots, shift=0.1 * UP), run_time=0.6, rate_func=smooth)
 
@@ -226,16 +248,27 @@ def create_latent_2d_scene_from_checkpoints(
         try:
             snapshot = checkpoint_manager.load_latent_snapshot(epoch, include_images=False)
             sample_nums = snapshot['sample_nums']
+            latent_vectors = snapshot['latent_vectors']
+            labels = snapshot['labels']
+            
+            print(f"Epoch {epoch}: Loaded {len(latent_vectors)} samples, {len(sample_nums)} sample_nums")
+            if len(latent_vectors) > 0:
+                print(f"  Latent range: [{latent_vectors[:, 0].min():.3f}, {latent_vectors[:, 0].max():.3f}], "
+                      f"[{latent_vectors[:, 1].min():.3f}, {latent_vectors[:, 1].max():.3f}]")
             
             # Find intersection of sample_nums across all epochs
             if all_sample_nums is None:
                 all_sample_nums = set(sample_nums)
+                print(f"  Initial sample_nums set: {len(all_sample_nums)} unique IDs")
             else:
+                before = len(all_sample_nums)
                 all_sample_nums = all_sample_nums.intersection(set(sample_nums))
+                after = len(all_sample_nums)
+                print(f"  After intersection: {before} -> {after} common IDs")
             
             latent_data[epoch] = (
-                snapshot['latent_vectors'],
-                snapshot['labels'],
+                latent_vectors,
+                labels,
                 sample_nums
             )
         except FileNotFoundError:
@@ -248,6 +281,7 @@ def create_latent_2d_scene_from_checkpoints(
     # Convert to sorted array for consistent ordering
     if all_sample_nums:
         all_sample_nums = np.array(sorted(all_sample_nums))
+        print(f"\nFinal common sample_nums: {len(all_sample_nums)} IDs")
     else:
         raise ValueError("No common sample_nums found across epochs")
     
@@ -259,6 +293,8 @@ def create_latent_2d_scene_from_checkpoints(
         filtered_latents = latent_vectors[mask]
         filtered_labels = labels[mask] if labels is not None else None
         filtered_sample_nums = sample_nums[mask]
+        
+        print(f"Epoch {epoch}: After filtering to common IDs: {len(filtered_latents)} samples")
         
         # Sort by sample_nums for consistent ordering
         sort_idx = np.argsort(filtered_sample_nums)
