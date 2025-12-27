@@ -36,7 +36,15 @@ class Latent2DScenePolished(BaseVisualizationScene):
         grid_opacity: float = 0.25,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        # Filter out scene-specific kwargs that shouldn't go to parent Scene
+        # Only pass through valid Manim Scene kwargs
+        scene_kwargs = {}
+        valid_scene_kwargs = ['camera_class', 'background_color', 'frame_rate']
+        for key, value in kwargs.items():
+            if key in valid_scene_kwargs:
+                scene_kwargs[key] = value
+        
+        super().__init__(**scene_kwargs)
         self.latent_data = latent_data
         self.num_classes = num_classes
         self.point_radius = point_radius
@@ -348,8 +356,21 @@ def create_latent_2d_scene_from_checkpoints(
     print(f"Using {config.jobs} parallel jobs for rendering")
     print(f"Aligned {len(all_sample_nums)} samples across all epochs")
     
+    # Filter scene_kwargs to only include valid parameters for Latent2DScenePolished
+    # Map point_size to point_radius if provided (for backward compatibility)
+    filtered_kwargs = {}
+    valid_params = ['num_classes', 'point_radius', 'seconds_per_epoch', 'show_labels', 
+                   'show_centroids', 'grid_opacity']
+    
+    for key, value in scene_kwargs.items():
+        if key == 'point_size':
+            # Map point_size to point_radius for backward compatibility
+            filtered_kwargs['point_radius'] = value
+        elif key in valid_params:
+            filtered_kwargs[key] = value
+    
     # Create scene instance
-    scene = Latent2DScenePolished(latent_data, **scene_kwargs)
+    scene = Latent2DScenePolished(latent_data, **filtered_kwargs)
     
     # Render the scene
     # Note: When calling render() directly, ensure Manim config is set up properly
