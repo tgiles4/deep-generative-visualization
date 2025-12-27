@@ -58,22 +58,22 @@ class Latent2DScenePolished(BaseVisualizationScene):
         # Test camera and rendering - ensure objects are visible
         self.camera.background_color = BACKGROUND_DARK
         
-        # Create test objects - use explicit positioning
-        test_text = Text("CAMERA OK", font_size=64, color="#FFFFFF")
-        test_dot = Dot(radius=0.2, color="#FF0000")
+        # # Create test objects - use explicit positioning
+        # test_text = Text("CAMERA OK", font_size=64, color="#FFFFFF")
+        # test_dot = Dot(radius=0.2, color="#FF0000")
         
-        # Position at origin explicitly
-        test_text.move_to([0, 0, 0])
-        test_dot.move_to([0, 0, 0])
+        # # Position at origin explicitly
+        # test_text.move_to([0, 0, 0])
+        # test_dot.move_to([0, 0, 0])
         
-        print(f"DEBUG: Adding test objects")
-        print(f"  Text center: {test_text.get_center()}")
-        print(f"  Dot center: {test_dot.get_center()}")
-        print(f"  Camera background: {self.camera.background_color}")
+        # print(f"DEBUG: Adding test objects")
+        # print(f"  Text center: {test_text.get_center()}")
+        # print(f"  Dot center: {test_dot.get_center()}")
+        # print(f"  Camera background: {self.camera.background_color}")
         
-        self.add(test_text, test_dot)
-        self.wait(2.0)  # Wait longer to see it
-        self.remove(test_text, test_dot)
+        # self.add(test_text, test_dot)
+        # self.wait(2.0)  # Wait longer to see it
+        # self.remove(test_text, test_dot)
 
         # --- ranges ---
         all_latents = np.concatenate([data[0] for data in self.latent_data.values()])
@@ -132,19 +132,21 @@ class Latent2DScenePolished(BaseVisualizationScene):
         plot_group = VGroup(plane, axes).to_edge(DOWN, buff=0.35)  # <-- no .scale()
 
         self.axes = axes
-        # --- title / labels ---
-        title = Text("Metric Space / Latent Space Evolution", font_size=56).set_color(PRIMARY_GREEN)
-        title.to_edge(UP, buff=0.25)
-        title.scale_to_fit_width(config.frame_width - 1.0)  # prevents clipping
-
-        # Epoch label with pill background for readability
+        # --- labels ---
+        # Epoch label with pill background - positioned inside plot area
         epoch_text = Text(f"Epoch {self.epochs[0]}", font_size=28).set_color("#FFFFFF")  # WHITE
         pill = RoundedRectangle(corner_radius=0.15, height=0.45, width=epoch_text.width + 0.5)
         pill.set_fill("#000000", opacity=0.55).set_stroke(width=0)  # BLACK with opacity
         
-        epoch_label = VGroup(pill, epoch_text).to_corner(UR, buff=0.25)
+        epoch_label = VGroup(pill, epoch_text)
         epoch_text.move_to(pill.get_center())
         epoch_label.set_z_index(50)
+        
+        # Position epoch label inside plot area (slightly above x-axis, left of origin)
+        epoch_label.move_to(axes.coords_to_point(
+            x_min_p + 0.15 * (x_max_p - x_min_p),
+            y_max_p - 0.10 * (y_max_p - y_min_p)
+        ))
 
         x_lab = self.create_label("z₁", font_size=FONT_SIZE_SMALL).next_to(axes.x_axis, RIGHT, buff=0.2)
         y_lab = self.create_label("z₂", font_size=FONT_SIZE_SMALL).next_to(axes.y_axis, UP, buff=0.2)
@@ -164,7 +166,7 @@ class Latent2DScenePolished(BaseVisualizationScene):
             legend_dots.add(legend_item)
 
         # Add plot_group first so axes are in the scene and transformed
-        self.add(plot_group, title)
+        self.add(plot_group)
         if self.show_labels:
             self.add(epoch_label, x_lab, y_lab, legend_dots)
         
@@ -215,8 +217,9 @@ class Latent2DScenePolished(BaseVisualizationScene):
                     centroids.append(latents[idx].mean(axis=0))
             return centroids
 
-        # Initialize centroid_groups outside the if block so it's accessible later
-        centroid_groups = VGroup()
+        # Initialize centroid containers outside the if block so they're accessible later
+        centroid_dots = VGroup()
+        centroid_labels = VGroup()
         
         if self.show_centroids:
             cents0 = compute_centroids(lat0, lab0)
@@ -225,33 +228,25 @@ class Latent2DScenePolished(BaseVisualizationScene):
                     continue
                 class_color = get_class_color(c, self.num_classes)
                 
-                # Centroid dot with white stroke for prominence
+                # Centroid dot - slightly bigger with white stroke
                 cd = Dot(
                     point=self.axes.coords_to_point(float(mu[0]), float(mu[1])),
-                    radius=self.point_radius * 2.2,
+                    radius=self.point_radius * 2.6,
                 ).set_color(class_color)
-                cd.set_stroke("#FFFFFF", width=2, opacity=0.9)  # WHITE stroke
                 cd.set_opacity(0.95)
+                cd.set_stroke("#FFFFFF", width=2.5, opacity=0.95)  # WHITE stroke
                 cd.set_z_index(20)
                 
-                # Badge background for label
-                badge = Circle(radius=0.18).set_fill("#000000", opacity=0.55).set_stroke(width=0)  # BLACK
-                badge.set_z_index(30)
+                # Label inside centroid - dead center with black stroke for readability
+                cl = Text(str(c), font_size=22, weight=BOLD).set_color("#FFFFFF")  # WHITE
+                cl.set_stroke("#000000", width=6, opacity=1.0)  # BLACK stroke - key for readability
+                cl.move_to(cd.get_center())
+                cl.set_z_index(30)
                 
-                # Label text with black stroke for visibility
-                cl = Text(str(c), font_size=26, weight=BOLD).set_color("#FFFFFF")  # WHITE
-                cl.set_stroke("#000000", width=6, opacity=1.0)  # BLACK stroke - the money line
-                cl.set_z_index(40)
-                
-                # Position badge and label above centroid
-                label_offset = 0.45 * UP
-                badge.move_to(cd.get_center() + label_offset)
-                cl.move_to(badge.get_center())
-                
-                centroid_label_group = VGroup(cd, badge, cl)
-                centroid_groups.add(centroid_label_group)
+                centroid_dots.add(cd)
+                centroid_labels.add(cl)
 
-            self.play(FadeIn(centroid_groups), run_time=0.4)
+            self.play(FadeIn(centroid_dots), FadeIn(centroid_labels), run_time=0.4)
 
         # --- animate epochs (in-place updates; no rebuilding) ---
         for i, epoch in enumerate(self.epochs[1:], start=1):
@@ -286,7 +281,6 @@ class Latent2DScenePolished(BaseVisualizationScene):
             if self.show_centroids:
                 cents = compute_centroids(lat, lab)
                 cent_anims = []
-                badge_anims = []
                 lab_anims = []
                 # update only the ones that exist
                 k = 0
@@ -294,25 +288,29 @@ class Latent2DScenePolished(BaseVisualizationScene):
                     if mu is None:
                         continue
                     target = self.axes.coords_to_point(float(mu[0]), float(mu[1]))
-                    label_offset = 0.45 * UP
-                    # centroid_groups[k] contains [cd, badge, cl]
-                    cent_anims.append(centroid_groups[k][0].animate.move_to(target))  # dot
-                    badge_anims.append(centroid_groups[k][1].animate.move_to(target + label_offset))  # badge
-                    lab_anims.append(centroid_groups[k][2].animate.move_to(target + label_offset))  # label
+                    # Keep labels glued to centroid center during motion
+                    cent_anims.append(centroid_dots[k].animate.move_to(target))
+                    lab_anims.append(centroid_labels[k].animate.move_to(target))
                     k += 1
                 if cent_anims:
-                    self.play(AnimationGroup(*cent_anims, *badge_anims, *lab_anims, lag_ratio=0.0),
+                    self.play(AnimationGroup(*cent_anims, *lab_anims, lag_ratio=0.0),
                               run_time=0.35,
                               rate_func=smooth)
 
             if self.show_labels:
-                # Update epoch label with pill background
+                # Update epoch label with pill background - keep it inside plot area
                 new_epoch_text = Text(f"Epoch {epoch}", font_size=28).set_color("#FFFFFF")
                 new_pill = RoundedRectangle(corner_radius=0.15, height=0.45, width=new_epoch_text.width + 0.5)
                 new_pill.set_fill("#000000", opacity=0.55).set_stroke(width=0)
-                new_epoch_label_group = VGroup(new_pill, new_epoch_text).to_corner(UR, buff=0.25)
+                new_epoch_label_group = VGroup(new_pill, new_epoch_text)
                 new_epoch_text.move_to(new_pill.get_center())
                 new_epoch_label_group.set_z_index(50)
+                
+                # Position inside plot area (same location as initial)
+                new_epoch_label_group.move_to(axes.coords_to_point(
+                    x_min_p + 0.15 * (x_max_p - x_min_p),
+                    y_max_p - 0.10 * (y_max_p - y_min_p)
+                ))
                 
                 # Transform the old epoch label to the new one
                 self.play(Transform(epoch_label, new_epoch_label_group), run_time=0.2)
