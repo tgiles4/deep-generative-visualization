@@ -85,29 +85,31 @@ class BaseVisualizationScene(Scene):
         if axis_config is None:
             axis_config = {}
         
-        default_config = {
-            'axis_config': {
-                'color': PRIMARY_GREEN,
-                'stroke_width': AXIS_WIDTH,
-            },
+        # Base axis configuration
+        base_axis_config = {
+            'color': PRIMARY_GREEN,
+            'stroke_width': AXIS_WIDTH,
+        }
+        
+        # Build config dict, merging with any provided overrides
+        config = {
+            'axis_config': {**base_axis_config, **axis_config.get('axis_config', {})},
             'x_axis_config': {
                 'color': PRIMARY_GREEN,
+                **axis_config.get('x_axis_config', {}),
             },
             'y_axis_config': {
                 'color': PRIMARY_GREEN,
-            },
-            'background_line_style': {
-                'stroke_color': GRID_COLOR,
-                'stroke_width': 1,
-                'stroke_opacity': GRID_OPACITY,
+                **axis_config.get('y_axis_config', {}),
             },
         }
-        default_config.update(axis_config)
         
+        # Create axes (Axes doesn't support background_line_style - that's for NumberPlane)
         axes = Axes(
             x_range=x_range,
             y_range=y_range,
-            **default_config,
+            **config,
         )
+        
         return axes
 
